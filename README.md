@@ -1,1 +1,0 @@
-Cevahiriyye test - GitHub bağlantısı çalışıyor.
