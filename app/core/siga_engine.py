@@ -208,6 +208,218 @@ def _replace_vowel_after_letter(
 
 
 # ============================================================
+# MUDÂAF — İDĞAM
+# ============================================================
+
+def _apply_mudaf_idgam(
+    word: str,
+    root: Root,
+    target_vowel: str,
+) -> str:
+    """
+    Mudâaf fiilde aynü'l-fiil ile lâmü'l-fiilin aynı olması
+    sebebiyle oluşan idğamı uygular.
+
+    Mâzî:
+
+        مَدَدَ → مَدَّ
+
+    Muzâri:
+
+        يَمْدُدُ → يَمُدُّ
+    """
+
+    # --------------------------------------------------------
+    # Aynü'l-fiil ile lâmü'l-fiil aynı değilse mudâaf değildir.
+    # --------------------------------------------------------
+
+    if root.ayn != root.lam:
+        return word
+
+    positions = _find_root_positions(
+        word,
+        root,
+    )
+
+    if positions is None:
+        return word
+
+    fa_index, ayn_index, lam_index = positions
+
+    # --------------------------------------------------------
+    # Aynü'l-fiilin mevcut harekesini bul.
+    # --------------------------------------------------------
+
+    ayn_vowel_index, ayn_vowel = (
+        _find_vowel_after_letter(
+            word,
+            ayn_index,
+        )
+    )
+
+    if ayn_vowel_index == -1:
+        return word
+
+    # --------------------------------------------------------
+    # Lâmü'l-fiilin mevcut harekesini bul.
+    # --------------------------------------------------------
+
+    lam_vowel_index, lam_vowel = (
+        _find_vowel_after_letter(
+            word,
+            lam_index,
+        )
+    )
+
+    if lam_vowel_index == -1:
+        return word
+
+    # --------------------------------------------------------
+    # MUDÂAF MUZÂRİDE HAREKE AKTARIMI
+    #
+    # يَمْدُدُ
+    #
+    # Burada:
+    #
+    # مْ دُ دُ
+    #
+    # İdğamdan sonra:
+    #
+    # مُ دُّ
+    #
+    # Yani aynü'l-fiilin dammesi, fâu'l-fiile aktarılır.
+    #
+    # Bu işlem yalnızca muzârîdeki damme durumunda uygulanır.
+    # --------------------------------------------------------
+
+    if (
+        target_vowel == "ُ"
+        and ayn_vowel == "ُ"
+    ):
+        fa_vowel_index, _ = _find_vowel_after_letter(
+            word,
+            fa_index,
+        )
+
+        if fa_vowel_index != -1:
+            result = _replace_vowel_after_letter(
+                word,
+                fa_index,
+                "ُ",
+            )
+        else:
+            result = (
+                word[:fa_index + 1]
+                + "ُ"
+                + word[fa_index + 1:]
+            )
+    else:
+        result = word
+
+    # --------------------------------------------------------
+    # İkinci aynı harfin harekesini kaldır.
+    #
+    # مَدَدَ
+    #     ↓
+    # مَدَد
+    #
+    # يَمُدُدُ
+    #       ↓
+    # يَمُدُد
+    # --------------------------------------------------------
+
+    # Önce kök konumlarını yeniden bul.
+    positions = _find_root_positions(
+        result,
+        root,
+    )
+
+    if positions is None:
+        return word
+
+    _, ayn_index, lam_index = positions
+
+    result = _remove_vowel_after_letter(
+        result,
+        lam_index,
+    )
+
+    # --------------------------------------------------------
+    # İkinci aynı harfi kaldır.
+    #
+    # مَدَد → مَد
+    #
+    # يَمُدُد → يَمُد
+    # --------------------------------------------------------
+
+    positions = _find_root_positions(
+        result,
+        root,
+    )
+
+    if positions is None:
+        return word
+
+    _, ayn_index, lam_index = positions
+
+    result = (
+        result[:lam_index]
+        + result[lam_index + 1:]
+    )
+
+    # --------------------------------------------------------
+    # Aynü'l-fiilin konumunu yeniden bul.
+    # --------------------------------------------------------
+
+    ayn_index = _find_letter_after(
+        result,
+        root.ayn,
+    )
+
+    if ayn_index == -1:
+        return word
+
+    # --------------------------------------------------------
+    # Aynü'l-fiilin mevcut harekesini kaldır.
+    #
+    # Mâzî:
+    #
+    # مَدَ → مَد
+    #
+    # Muzâri:
+    #
+    # يَمُد → يَمُد
+    #
+    # Sonra şedde + hedef hareke ekleyeceğiz.
+    # --------------------------------------------------------
+
+    result = _remove_vowel_after_letter(
+        result,
+        ayn_index,
+    )
+
+    # --------------------------------------------------------
+    # ŞEDDE + HAREKE
+    #
+    # Unicode sırası:
+    #
+    # دَّ
+    # دُّ
+    #
+    # Şedde önce, hareke sonra.
+    # --------------------------------------------------------
+
+    result = (
+        result[:ayn_index + 1]
+        + "ّ"
+        + target_vowel
+        + result[ayn_index + 1:]
+    )
+
+    return result
+
+
+# ============================================================
 # ECVEF — MÂZÎ MEÇHUL İ'LÂLİ
 # ============================================================
 
@@ -253,10 +465,6 @@ def _apply_hollow_past_passive_ilal(
 
     fa_index, weak_index, _ = positions
 
-    # --------------------------------------------------------
-    # İllet harfinin harekesini bul.
-    # --------------------------------------------------------
-
     weak_vowel_index, weak_vowel = (
         _find_vowel_after_letter(
             word,
@@ -270,18 +478,10 @@ def _apply_hollow_past_passive_ilal(
     ):
         return word
 
-    # --------------------------------------------------------
-    # 1. İllet harfinin üzerindeki kesrayı kaldır.
-    # --------------------------------------------------------
-
     result = _remove_vowel_after_letter(
         word,
         weak_index,
     )
-
-    # --------------------------------------------------------
-    # 2. Fâu'l-fiilin mevcut harekesini kaldır.
-    # --------------------------------------------------------
 
     fa_index = _find_letter_after(
         result,
@@ -296,22 +496,11 @@ def _apply_hollow_past_passive_ilal(
         fa_index,
     )
 
-    # --------------------------------------------------------
-    # 3. Kesrayı fâu'l-fiile aktar.
-    # --------------------------------------------------------
-
     result = _replace_vowel_after_letter(
         result,
         fa_index,
         "ِ",
     )
-
-    # --------------------------------------------------------
-    # 4. İllet harfini yâya çevir.
-    #
-    # قُوِلَ → قِيلَ
-    # بُيِعَ → بِيعَ
-    # --------------------------------------------------------
 
     weak_index = _find_letter_after(
         result,
@@ -341,24 +530,6 @@ def _apply_hollow_present_passive_ilal(
 ) -> str:
     """
     Ecvef fiilin muzâri meçhulündeki i'lâli uygular.
-
-    Vâvî:
-
-        يُقْوَلُ
-        ↓
-        يُقَالُ
-
-    Yâî:
-
-        يُبْيَعُ
-        ↓
-        يُبَاعُ
-
-    İşlem sırası:
-
-        1. İllet harfinin üzerindeki fetha kaldırılır.
-        2. Fetha fâu'l-fiile aktarılır.
-        3. Sakin kalan illet harfi elife çevrilir.
     """
 
     if root.ayn not in (
@@ -377,10 +548,6 @@ def _apply_hollow_present_passive_ilal(
 
     fa_index, weak_index, _ = positions
 
-    # --------------------------------------------------------
-    # İllet harfinin harekesini bul.
-    # --------------------------------------------------------
-
     weak_vowel_index, weak_vowel = (
         _find_vowel_after_letter(
             word,
@@ -394,18 +561,10 @@ def _apply_hollow_present_passive_ilal(
     ):
         return word
 
-    # --------------------------------------------------------
-    # 1. İllet harfinin üzerindeki fethayı kaldır.
-    # --------------------------------------------------------
-
     result = _remove_vowel_after_letter(
         word,
         weak_index,
     )
-
-    # --------------------------------------------------------
-    # 2. Fâu'l-fiilin mevcut harekesini kaldır.
-    # --------------------------------------------------------
 
     fa_index = _find_letter_after(
         result,
@@ -420,22 +579,11 @@ def _apply_hollow_present_passive_ilal(
         fa_index,
     )
 
-    # --------------------------------------------------------
-    # 3. Fethayı fâu'l-fiile aktar.
-    # --------------------------------------------------------
-
     result = _replace_vowel_after_letter(
         result,
         fa_index,
         "َ",
     )
-
-    # --------------------------------------------------------
-    # 4. İllet harfini elife çevir.
-    #
-    # يُقْوَلُ → يُقَالُ
-    # يُبْيَعُ → يُبَاعُ
-    # --------------------------------------------------------
 
     weak_index = _find_letter_after(
         result,
@@ -494,18 +642,10 @@ def _delete_hollow_letter_from_jussive(
 
     _, weak_index, _ = positions
 
-    # --------------------------------------------------------
-    # İllet harfini sil.
-    # --------------------------------------------------------
-
     result = (
         word[:weak_index]
         + word[weak_index + 1:]
     )
-
-    # --------------------------------------------------------
-    # İllet harfinin arkasındaki harekeyi sil.
-    # --------------------------------------------------------
 
     if (
         weak_index < len(result)
@@ -515,10 +655,6 @@ def _delete_hollow_letter_from_jussive(
             result[:weak_index]
             + result[weak_index + 1:]
         )
-
-    # --------------------------------------------------------
-    # Lâmü'l-fiili bul.
-    # --------------------------------------------------------
 
     fa_index = _find_letter_after(
         result,
@@ -536,10 +672,6 @@ def _delete_hollow_letter_from_jussive(
 
     if lam_index == -1:
         return result
-
-    # --------------------------------------------------------
-    # Lâmü'l-fiilin harekesini cezm yap.
-    # --------------------------------------------------------
 
     after_lam = lam_index + 1
 
@@ -665,17 +797,9 @@ def _make_emr_hazir(
     if not present.startswith("ي"):
         return present
 
-    # --------------------------------------------------------
-    # 1. Muzâraat harfini + harekesini kaldır.
-    # --------------------------------------------------------
-
     base_present = _remove_muzari_prefix(
         present,
     )
-
-    # --------------------------------------------------------
-    # 2. Meczûm hâle getir.
-    # --------------------------------------------------------
 
     jussive = _make_jussive(
         present,
@@ -689,19 +813,11 @@ def _make_emr_hazir(
     if not base:
         return base_present
 
-    # --------------------------------------------------------
-    # 3. Ecvef.
-    # --------------------------------------------------------
-
     if root.ayn in (
         "و",
         "ي",
     ):
         return base
-
-    # --------------------------------------------------------
-    # 4. Normal fiil.
-    # --------------------------------------------------------
 
     if len(base) < 2:
         return base
@@ -724,53 +840,17 @@ def _build_past_passive(
 ) -> str:
     """
     Sülâsî mücerred fiilin mâzî meçhulünü üretir.
-
-    Genel kalıp:
-
-        فُعِلَ
-
-    Örnek:
-
-        نَصَرَ → نُصِرَ
-
-    Ecvef vâvî:
-
-        قَالَ
-        ↓
-        قُوِلَ
-        ↓
-        قِيلَ
-
-    Ecvef yâî:
-
-        بَاعَ
-        ↓
-        بُيِعَ
-        ↓
-        بِيعَ
     """
-
-    # --------------------------------------------------------
-    # Bâb uygunluğunu doğrula.
-    # --------------------------------------------------------
 
     build_verb(
         root,
         bab,
     )
 
-    # --------------------------------------------------------
-    # Genel mâzî meçhul.
-    # --------------------------------------------------------
-
     result = apply_pattern(
         "فُعِلَ",
         root,
     )
-
-    # --------------------------------------------------------
-    # Ecvef i'lâli.
-    # --------------------------------------------------------
 
     if root.ayn in (
         "و",
@@ -794,62 +874,12 @@ def _build_present_passive(
 ) -> str:
     """
     Sülâsî mücerred fiilin muzâri meçhulünü üretir.
-
-    Genel kalıp:
-
-        يُفْعَلُ
-
-    Sahih:
-
-        يَنْصُرُ
-        ↓
-        يُنْصَرُ
-
-    Misâl-i Vâvî:
-
-        يَعِدُ
-        ↓
-        يُوْعَدُ
-        ↓
-        يُوعَدُ
-
-    Misâl-i Yâî:
-
-        يَيْسِرُ
-        ↓
-        يُيْسَرُ
-        ↓
-        يُوسَرُ
-
-    Ecvef vâvî:
-
-        يَقُولُ
-        ↓
-        يُقْوَلُ
-        ↓
-        يُقَالُ
-
-    Ecvef yâî:
-
-        يَبِيعُ
-        ↓
-        يُبْيَعُ
-        ↓
-        يُبَاعُ
     """
-
-    # --------------------------------------------------------
-    # Bâb uygunluğunu doğrula.
-    # --------------------------------------------------------
 
     build_verb(
         root,
         bab,
     )
-
-    # --------------------------------------------------------
-    # Genel muzâri meçhul.
-    # --------------------------------------------------------
 
     result = apply_pattern(
         "يُفْعَلُ",
@@ -882,13 +912,6 @@ def _build_present_passive(
         )
 
         if vav_index != -1:
-            # Kitaptaki yazım:
-            #
-            # يُوعَدُ
-            #
-            # Vâv korunur ancak üzerindeki
-            # sükûn ayrıca gösterilmez.
-
             result = _remove_vowel_after_letter(
                 result,
                 vav_index,
@@ -973,9 +996,6 @@ def build_siga(
 
         "passive"
             Meçhul / edilgen
-
-    Meçhul, yeni bir sîga numarası değildir.
-    Sîganın binâsı olarak ele alınır.
     """
 
     # ========================================================
@@ -1028,14 +1048,28 @@ def build_siga(
     # ========================================================
 
     if siga.number == 1:
-        return verb.past
+
+        result = verb.past
+
+        return _apply_mudaf_idgam(
+            result,
+            root,
+            "َ",
+        )
 
     # ========================================================
     # 2 - MUZÂRİ
     # ========================================================
 
     if siga.number == 2:
-        return verb.present
+
+        result = verb.present
+
+        return _apply_mudaf_idgam(
+            result,
+            root,
+            "ُ",
+        )
 
     # ========================================================
     # 3 - MASTAR
